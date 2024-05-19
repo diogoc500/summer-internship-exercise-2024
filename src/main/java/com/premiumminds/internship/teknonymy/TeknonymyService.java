@@ -4,26 +4,34 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Challenge note:
- * "I implemented both an iterative and a recursive solution. Both of them are O(n). Both take
- * almost the same time. I decided to present the iterative version for two reasons:
+ * Exercise note:
+ * "I implemented both an iterative and a recursive solution. Both of them are of O(n) time complexity. However, the
+ * recursive version turned out to be the fastest. I noticed this after implementing the tests of the huge-complete trees.
+ * When I was testing with tests that were only taking < 10ms, they seemed to be performing the same, so, at first, I decided
+ * to present the iterative version for two reasons:
  * - It is more scalable. The recursive version can throw stack overflows if the tree is too tall.
  * - The recursive version has to use an additional data record.
  *
- * I still left the recursive solution because it is interesting to compare both approaches - while the iterative
- * version uses a breadth-first approach, the recursive version uses a depth first approach.
+ * Even though the 2nd 'problem' still remains, the first turned out to be fine because for a realistic number of generations
+ * and children, the program actually runs out of heap space first (too many nodes to allocate) than it throws a stack
+ * overflow exception. Actually, stack overflows, on the recursive version, depends solely on the number of generations.
+ * After testing for trees with 1 child each but with 1000 generations, I concluded that stack overflows were not an issue
+ * for this exercise.
  *
- * To use the recursive version just uncomment the commented line in 'getTeknonymy'.
+ * In the end, I decided to present the recursive version as my solution.
  *
- * I also developed a parallel version of the recursive code to take advantage of multicore systems. However, for
- * some reason, the object returned by 'Executors.newFixedThreadPool(n)' would hang if too many task submissions
- * were made to it, so even though the code was correct, its completion would depend on 'n'. To choose a correct value
- * for 'n', one would have to calculate the number of nodes in the tree before allocating threads. With the current
- * implementation of the tree, it is not faster to find the number of nodes and then execute the parallel version
- * than it is to just execute one of the sequential algorithms, so I decided not to include the parallel version in my
- * final submission."
+ * I still left the iterative solution because it is interesting to compare both approaches - while the iterative
+ * version uses a breadth-first approach, the recursive version uses a depth-first approach.
+ *
+ * To use the iterative version just uncomment the commented line in 'getTeknonymy'.
+ *
+ * I also developed a recursive parallel version, but it turned out to be slower because of thread creation overhead.
+ * Trying to limit the number of threads to some 'n' number and doing the sequential version of the code if no more
+ * threads were available proved to be too complex for the scope of this exercise. In the end, I decided not to
+ * submit the parallel version."
  */
 
 class TeknonymyService implements ITeknonymyService {
@@ -34,11 +42,11 @@ class TeknonymyService implements ITeknonymyService {
      * @return String which is the Teknonymy Name
      */
     @Override
-    public String getTeknonymy(Person person){
-        return getTeknonymy_iter(person);
-        // return getTeknonymy_rec(person);
+    public String getTeknonymy(Person person) {
+        return getTeknonymy_rec(person);
+        // return getTeknonymy_iter(person);
 
-        // TODO: REMOVE
+        // TODO: Remove
         // return getTeknonymy_par(person);
     }
 
@@ -88,21 +96,21 @@ class TeknonymyService implements ITeknonymyService {
     // ===== RECURSIVE SOLUTION =====
 
     /**
-     * Entrance method for the recursive 'getFarthestOldestChild' method.
-     * @param person person
-     * @return String which is the Teknonymy Name
-     */
-    public String getTeknonymy_rec(Person person){
-        ChildDepth cd = getFarthestOldestChild(new ChildDepth(person, -1));
-        return buildTeknonymy(person, cd.person, cd.depth);
-    }
-
-    /**
      * Aux. data class for the recursive algorithm.
      * @param person person
      * @param depth depth relative to the bottom of the tree, not the root.
      */
     private record ChildDepth(Person person, int depth) {
+    }
+
+    /**
+     * Entrance method for the recursive 'getFarthestOldestChild' method.
+     * @param person person
+     * @return String which is the Teknonymy Name
+     */
+    public String getTeknonymy_rec(Person person) {
+        ChildDepth cd = getFarthestOldestChild(new ChildDepth(person, -1));
+        return buildTeknonymy(person, cd.person, cd.depth);
     }
 
     /**
@@ -122,7 +130,7 @@ class TeknonymyService implements ITeknonymyService {
         for (Person child : childDepth.person.children()) {
             // Depth '-1' is used for the downwards propagation phase, but any number would do.
             ChildDepth cd = getFarthestOldestChild(new ChildDepth(child, -1));
-            if (oldestChild == null){
+            if (oldestChild == null) {
                 oldestChild = cd.person;
                 depthOfOldestChild = cd.depth;
             }
@@ -140,11 +148,11 @@ class TeknonymyService implements ITeknonymyService {
 
     // TODO: REMOVE
     // ===== PARALLEL VERSION =====
-    /*public String getTeknonymy_par(Person person){
+    /*public String getTeknonymy_par(Person person) {
         ChildDepth cd = null;
-        try{
+        try {
             cd = new PersonTask(null).getTeknonymy_par(person);
-        } catch (Exception e){
+        } catch (Exception e) {
             System.err.println("Could not complete parallel version of getTeknonymy.\n");
             e.printStackTrace();
 
@@ -154,27 +162,17 @@ class TeknonymyService implements ITeknonymyService {
     }
 
     private class PersonTask implements Callable<ChildDepth> {
-        private static ExecutorService taskExec = null;
+
+        private static final int numProcessors = Runtime.getRuntime().availableProcessors();
+        private static final ExecutorService taskExec = Executors.newFixedThreadPool(numProcessors);
+
         private final ChildDepth childDepth;
 
         public PersonTask(ChildDepth childDepth) {
             this.childDepth = childDepth;
         }
 
-        private static int numOfNodes(Person person){
-            if(person.children() == null)
-                return 1;
-
-            int count = 0;
-            for (Person child: person.children())
-                count += numOfNodes(child);
-
-            return count + 1;
-        }
-
         public ChildDepth getTeknonymy_par(Person person) throws Exception {
-            int n = numOfNodes(person);
-            taskExec = Executors.newFixedThreadPool(n);
             return taskExec.submit(new PersonTask(new ChildDepth(person, -1))).get();
         }
 
@@ -187,12 +185,12 @@ class TeknonymyService implements ITeknonymyService {
             int depthOfOldestChild = -1;
 
             List<Future<ChildDepth>> futures = new LinkedList<>();
-            for(Person child : childDepth.person.children())
+            for (Person child : childDepth.person.children())
                 futures.add(taskExec.submit(new PersonTask(new ChildDepth(child, -1))));
 
-            for(Future<ChildDepth> childDepthFuture: futures){
+            for (Future<ChildDepth> childDepthFuture : futures) {
                 ChildDepth cd = childDepthFuture.get();
-                if (oldestChild == null){
+                if (oldestChild == null) {
                     oldestChild = cd.person;
                     depthOfOldestChild = cd.depth;
                 }
@@ -210,6 +208,7 @@ class TeknonymyService implements ITeknonymyService {
     }*/
 
     // ===== AUX METHODS =====
+
     /**
      * Builds the Teknonymy of a person given their 'descendant' and their depth in the family tree.
      *
@@ -218,7 +217,7 @@ class TeknonymyService implements ITeknonymyService {
      * @param depth Depth at which the 'descendant' is at.
      * @return Teknonymy
      */
-    private String buildTeknonymy(Person person, Person descendant, int depth) {
+    private static String buildTeknonymy(Person person, Person descendant, int depth) {
         StringBuilder degree = new StringBuilder();
 
         if (depth >= 1)
