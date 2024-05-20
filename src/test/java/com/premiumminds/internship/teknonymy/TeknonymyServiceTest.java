@@ -279,7 +279,7 @@ public class TeknonymyServiceTest {
      * Creates a complete family tree. Entrance method for recursive method.
      * (n^height-1)/(n-1) - 1 should be <= Integer.MAX_VALUE
      * However, also be careful not to get a 'java.lang.OutOfMemoryError: Java heap space'.
-     * The result is expected to be (n^(height-1)-1)/(n-1)
+     * The result is expected to be Person with number (n^(height-1)-1)/(n-1)
      * @param n how many children does each person have
      * @param height height of the tree. The height of a tree with 1 node (root) is 1.
      * @return root of the tree.
